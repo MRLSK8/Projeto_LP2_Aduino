@@ -8,7 +8,6 @@ LiquidCrystal_I2C lcd(0x27,2,1,0,4,5,6,7,3, POSITIVE);
 
 // variáveis do programa
 const int pinoSensor = A0;
-const int pinoValvula = 10;
 int limiarSeco; // Valor maximo de umidade do solo
 const int tempoRega = 50; // Tempo de rega em segundos
 int umidadeSolo = 0; // Recebe o valor da umidade do solo
@@ -19,35 +18,32 @@ int pino_d = 2; //Pino ligado ao D0 do sensor
 int pino_a = A2; //Pino ligado ao A0 do sensor
 int val_d = 0; //Armazena o valor lido do pino digital
 int val_a = 0; //Armazena o valor lido do pino analogico
+const int RelePin = 7; // pino ao qual o Módulo Relé está conectado
+
+// Medir fluxo de agua
+#define LITER 403
+ 
+volatile int pulse;
+int liters = 0;
 
 void setup() {
-  
-  pinMode(pinoValvula, OUTPUT);
-  // Desliga a válvula
-  digitalWrite(pinoValvula, HIGH);
+  pulse = 0;
+  Serial.begin(9600);
+  attachInterrupt(digitalPinToInterrupt(3),changeState,FALLING);
   // define o tamanho do Display LCD
   lcd.begin(16, 2);
-
+  pinMode(RelePin, OUTPUT); // seta o pino como saída 
+  digitalWrite(RelePin, LOW);  //desativa o pino
   // Define os pinos do sensor como entrada
   pinMode(pino_d, INPUT);
   pinMode(pino_a, INPUT);
-
-  Serial.begin(9600);
-
 }
 
 void loop() {
   // Mede a umidade a cada segundo. Faz isso durante uma hora (3600 segundos).
   for(int i=0; i < 5; i++) {
     
-    DHT.read11(pinoDHT11); //LÊ AS INFORMAÇÕES DO SENSOR DE UMIDADE E TEMPERATURA
-    /*Serial.print("Umidade: "); //IMPRIME O TEXTO NA SERIAL
-    Serial.print(DHT.humidity); //IMPRIME NA SERIAL O VALOR DE UMIDADE MEDIDO
-    Serial.print("%"); //ESCREVE O TEXTO EM SEGUIDA
-    Serial.print(" / Temperatura: "); //IMPRIME O TEXTO NA SERIAL
-    Serial.print(DHT.temperature, 0); //IMPRIME NA SERIAL O VALOR DE UMIDADE MEDIDO E REMOVE A PARTE DECIMAL
-    Serial.println("*C"); //IMPRIME O TEXTO NA SERIAL
-    */
+    DHT.read11(pinoDHT11); 
     
     // Posiciona o cursor do LCD na coluna 0 linha 1
     // (Obs: linha 1 é a segunda linha, a contagem começa em 0
@@ -78,13 +74,6 @@ void loop() {
     //Le e armazena o valor do pino analogico
     val_a = analogRead(pino_a);
     
-    /*//Envia as informacoes para o serial monitor
-    Serial.print("Valor digital : ");
-    Serial.print(val_d);
-    Serial.print(" - Valor analogico : ");
-    Serial.println(val_a);
-    */
-    
     delay(500);
   }
   
@@ -97,17 +86,28 @@ void loop() {
     lcd.print("Solo Encharcado ");
     // Espera o tempo estipulado
     delay(3000);
+    liters = 0;
+    digitalWrite(RelePin, LOW);  //desativa o pino
   }else if((val_a > 512 && val_a < 1024) || (umidadeSolo < limiarSeco))
   {
     // Posiciona o cursor do LCD na coluna 0 linha 1
     // (Obs: linha 1 é a segunda linha, a contagem começa em 0
     lcd.setCursor(0, 1);
     // Exibe a mensagem no Display LCD:
-    lcd.print("    Regando     ");
-    // Liga a válvula
-    digitalWrite(pinoValvula, LOW);
-    // Espera o tempo estipulado
+    digitalWrite(RelePin, HIGH); //aciona o pino
+    lcd.print("Regando ");
+
+    lcd.print(liters);
+    lcd.println(" L     ");
+    
     delay(3000);
-    digitalWrite(pinoValvula, HIGH);
   }
+}
+
+void changeState(){
+    pulse += 1;
+    if (pulse >LITER){
+        pulse   = 0;
+        liters += 1;
+    }
 }
